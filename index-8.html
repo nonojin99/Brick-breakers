@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>BRICK ORBIT — 벽돌깨기</title>
+<style>
+  :root {
+    --bg: #060a14;
+    --panel: #0e1626;
+    --line: rgba(120,150,200,0.18);
+    --cyan: #5ac8ff;
+    --text: #e8eefc;
+    --dim: #7d8db0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #app { display: flex; gap: 20px; align-items: flex-start; padding: 24px; }
+
+  /* ── HUD (관측소 계기판) ── */
+  aside {
+    width: 168px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; font-family: Consolas, monospace;
+  }
+  aside h2 { font-size: 11px; letter-spacing: 3px; color: var(--dim); margin-bottom: 14px; }
+  .stat { margin-bottom: 14px; }
+  .stat .label { font-size: 10px; letter-spacing: 2px; color: var(--dim); }
+  .stat .value { font-size: 30px; color: var(--cyan); }
+  #hud-right .value { color: #ff9f6b; }
+  button {
+    width: 100%; padding: 10px; margin-top: 6px;
+    background: transparent; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    font-family: inherit; font-size: 13px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  button:hover:not(:disabled) { border-color: var(--cyan); background: rgba(90,200,255,0.08); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  canvas { border: 1px solid var(--line); border-radius: 10px; cursor: crosshair; display: block; }
+
+  /* ── 오버레이 패널 ── */
+  #overlay {
+    position: fixed; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(6,10,20,0.82); backdrop-filter: blur(3px);
+  }
+  .panel {
+    display: none; flex-direction: column; gap: 10px;
+    width: 340px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 14px; padding: 32px;
+    text-align: center;
+  }
+  .panel h1 {
+    font-family: Consolas, monospace; font-size: 26px;
+    letter-spacing: 6px; color: var(--cyan); margin-bottom: 4px;
+  }
+  .panel .sub { color: var(--dim); font-size: 12px; margin-bottom: 16px; }
+  .panel button { padding: 13px; font-size: 15px; }
+  #offline-note { display: none; color: var(--dim); font-size: 11px; margin-top: 10px; }
+  .spinner {
+    width: 34px; height: 34px; margin: 12px auto;
+    border: 3px solid var(--line); border-top-color: var(--cyan);
+    border-radius: 50%; animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+  #board-list { list-style: none; text-align: left; font-family: Consolas, monospace; font-size: 14px; }
+  #board-list li { display: flex; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+  #board-list .rank { color: var(--cyan); width: 22px; }
+  #board-list .score { margin-left: auto; color: var(--dim); }
+  #over-title { font-size: 30px; }
+  #over-detail { color: var(--dim); }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <aside id="hud-left">
+    <h2>CONTROL</h2>
+    <div class="stat"><div class="label">ROUND</div><div class="value" id="hud-round">–</div></div>
+    <div class="stat"><div class="label">BALLS</div><div class="value" id="hud-balls">–</div></div>
+    <div class="stat"><div class="label">MODE</div><div class="value" id="hud-mode" style="font-size:16px">–</div></div>
+    <div class="stat" id="timer-box" style="display:none">
+      <div class="label">TIMER</div><div class="value" id="hud-timer">10</div>
+    </div>
+    <div id="atk-in" style="display:none; color:#ff6b6b; font-size:12px; margin-bottom:10px;"></div>
+    <div id="atk-out" style="display:none; color:#ffd166; font-size:12px; margin-bottom:10px;"></div>
+    <button id="btn-speed">배속 x1</button>
+  </aside>
+
+  <canvas id="game" width="704" height="880"></canvas>
+
+  <aside id="hud-right" style="display:none">
+    <h2>OPPONENT</h2>
+    <div class="stat"><div class="label">ROUND</div><div class="value" id="opp-round">0</div></div>
+    <div class="stat"><div class="label">BALLS</div><div class="value" id="opp-balls">0</div></div>
+    <div class="sub" style="color:var(--dim);font-size:11px">같은 시드로 동시 플레이 중.<br>먼저 죽으면 패배!</div>
+  </aside>
+</div>
+
+<div id="overlay">
+  <div class="panel" id="panel-menu" style="display:flex">
+    <h1>BRICK ORBIT</h1>
+    <div class="sub">각도를 조준해 발사 · 벽돌이 바닥에 닿으면 끝</div>
+    <button id="btn-solo">솔로 플레이</button>
+    <button id="btn-ranked">랭킹전 (실시간 1v1)</button>
+    <button id="btn-friend">친선전 (초대 코드)</button>
+    <button id="btn-board">리더보드</button>
+    <button id="btn-nick">닉네임 변경</button>
+    <div id="offline-note">config.js에 Supabase 설정이 없어 온라인 기능이 꺼져 있습니다.</div>
+  </div>
+
+  <div class="panel" id="panel-friend">
+    <h1>FRIENDLY</h1>
+    <div class="sub">방을 만들어 코드를 공유하거나, 받은 코드로 참가하세요</div>
+    <button id="btn-friend-create">방 만들기</button>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <input id="friend-code-input" maxlength="4" placeholder="코드 4자리"
+        style="flex:1; padding:12px; background:transparent; color:var(--text);
+               border:1px solid var(--line); border-radius:8px;
+               font-family:Consolas,monospace; font-size:17px; letter-spacing:5px;
+               text-align:center; text-transform:uppercase;" />
+      <button id="btn-friend-join" style="width:auto; padding:12px 18px; margin-top:0;">참가</button>
+    </div>
+    <button id="btn-friend-back">뒤로</button>
+  </div>
+
+  <div class="panel" id="panel-matching">
+    <h1>MATCHING</h1>
+    <div class="spinner"></div>
+    <div id="match-code-box" style="display:none">
+      <div class="sub">친구에게 이 코드를 공유하세요</div>
+      <div id="match-code"
+        style="font-family:Consolas,monospace; font-size:40px; letter-spacing:12px;
+               color:var(--cyan); margin:4px 0 10px;"></div>
+    </div>
+    <div class="sub">상대를 찾는 중… (다른 브라우저 탭으로도 테스트 가능)</div>
+    <button id="btn-cancel-match">취소</button>
+  </div>
+
+  <div class="panel" id="panel-over">
+    <h1 id="over-title">GAME OVER</h1>
+    <div class="sub" id="over-detail"></div>
+    <button id="btn-retry">다시 하기</button>
+    <button id="btn-menu">메뉴로</button>
+  </div>
+
+  <div class="panel" id="panel-board">
+    <h1>RANKING</h1>
+    <ul id="board-list"></ul>
+    <button onclick="document.getElementById('btn-menu').click()">닫기</button>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
