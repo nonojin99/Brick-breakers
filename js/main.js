@@ -41,6 +41,13 @@ $('btn-friend-create').onclick = () => startFriendHost();
 $('btn-friend-join').onclick = () => startFriendJoin();
 $('btn-friend-back').onclick = () => backToMenu();
 $('btn-board').onclick = () => showLeaderboard();
+$('btn-nick').onclick = () => {
+  const n = prompt('새 닉네임 (최대 12자)', nickname());
+  if (n && n.trim()) {
+    localStorage.setItem('bb_nick', n.trim().slice(0, 12));
+    alert(`닉네임이 "${nickname()}"(으)로 변경되었습니다. 다음 기록부터 적용됩니다.`);
+  }
+};
 $('btn-retry').onclick = () => (mode === 'solo' ? startSolo() : backToMenu());
 $('btn-menu').onclick = () => backToMenu();
 $('btn-cancel-match').onclick = async () => { await match?.leave(); match = null; backToMenu(); };
