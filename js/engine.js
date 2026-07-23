@@ -216,7 +216,14 @@ export class Engine {
 
   // ── 턴 시스템 ──────────────────────────────────────────────
   // 게임 시작: 시드 고정 (멀티플레이 시 양쪽에 같은 seed 전달)
-  startGame(seed) {
+  // tuning: 모드별 난이도 조절 (기본값 = 대전 기준. 솔로는 완화값 주입)
+  startGame(seed, tuning = {}) {
+    this.tuning = {
+      itemChance: 0.12,      // 아이템 생성 확률
+      ballPlusW: 0.5,        // 아이템 중 구슬+1 비중
+      doubleHpChance: 0.15,  // 벽돌 HP 2배 확률
+      ...tuning,
+    };
     this.rng = createRng(seed);
     this.grid = this.emptyGrid();
     this.round = 1;
@@ -231,18 +238,23 @@ export class Engine {
 
   // 신규 행 생성 (최상단). 벽돌/아이템/빈칸 — 전부 시드 rng 사용
   spawnRow() {
+    const t = this.tuning;
     const density = Math.min(0.6, 0.4 + this.round * 0.01);
-    const ITEM_CHANCE = 0.12;
     let spawned = 0;
     for (let col = 0; col < this.cfg.cols; col++) {
       const roll = this.rng();
       if (roll < density) {
-        const hp = this.rng() < 0.15 ? this.round * 2 : this.round;
+        const hp = this.rng() < t.doubleHpChance ? this.round * 2 : this.round;
         this.grid[0][col] = { type: 'normal', hp };
         spawned++;
-      } else if (roll < density + ITEM_CHANCE) {
+      } else if (roll < density + t.itemChance) {
         const v = this.rng();
-        const kind = v < 0.5 ? 'ball+1' : v < 0.7 ? 'pierce' : v < 0.85 ? 'split' : 'bomb';
+        const w = t.ballPlusW;
+        const rest = (1 - w) / 3;
+        const kind =
+          v < w              ? 'ball+1' :
+          v < w + rest       ? 'pierce' :
+          v < w + rest * 2   ? 'split'  : 'bomb';
         this.grid[0][col] = { type: 'item', kind };
       }
     }

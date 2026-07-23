@@ -18,8 +18,14 @@ let match = null;          // 랭킹전 세션
 let opp = { round: 0, ballCount: 0, dead: false, deadRound: 0 };
 let myDead = false;
 let online = false;
-const TURN_TIME = 10_000;  // 대전 모드: 10초 내 미발사 시 자동 발사
+const TURN_TIME = 7_000;   // 대전 모드: 7초 내 미발사 시 자동 발사 (지연 이득 축소)
 let turnDeadline = 0;
+// 솔로 전용 난이도 완화 (대전은 엔진 기본값 사용 — 시드 동기화 유지)
+const SOLO_TUNING = {
+  itemChance: 0.18,      // 아이템 확률 0.12 → 0.18
+  ballPlusW: 0.65,       // 구슬+1 비중 0.5 → 0.65
+  doubleHpChance: 0.10,  // 강화 벽돌 확률 0.15 → 0.10
+};
 
 const nickname = () => localStorage.getItem('bb_nick') || '';
 
@@ -71,7 +77,7 @@ function showPanel(name) {
 // ── 솔로 시작 ──
 function startSolo() {
   mode = 'solo';
-  engine.startGame(Math.floor(Math.random() * 2 ** 31));
+  engine.startGame(Math.floor(Math.random() * 2 ** 31), SOLO_TUNING);
   resetPlayState();
 }
 
@@ -170,6 +176,15 @@ function resetPlayState() {
   myDead = false;
   turnDeadline = performance.now() + TURN_TIME;
   $('timer-box').style.display = mode === 'ranked' ? 'block' : 'none';
+  // 대전: 공정성 위해 2배속 고정 (선택 불가). 솔로: 자유 토글
+  if (mode === 'ranked') {
+    speedMult = 2;
+    $('btn-speed').style.display = 'none';
+  } else {
+    speedMult = 1;
+    $('btn-speed').textContent = '배속 x1';
+    $('btn-speed').style.display = 'block';
+  }
   updateAtkHud();
   showPanel(null);
   updateHud();
@@ -216,9 +231,9 @@ function loop() {
     }
     if (engine.isTurnOver()) {
       flying = false;
-      // 공격 판정: 이번 턴 파괴 수 5개당 1줄 (최대 3줄)
+      // 공격 판정: 이번 턴 파괴 수 4개당 1줄 (최대 3줄)
       const destroyed = engine.events.filter((v) => v.t === 'destroy').length;
-      const atkRows = Math.min(3, Math.floor(destroyed / 5));
+      const atkRows = Math.min(3, Math.floor(destroyed / 4));
       engine.endTurn();
       updateHud();
       updateAtkHud();

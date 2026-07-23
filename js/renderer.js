@@ -62,16 +62,7 @@ export class Renderer {
         const x = col * cs, y = row * cs;
 
         if (cell.type === 'item') {
-          const st = ITEM_STYLE[cell.kind];
-          ctx.strokeStyle = st.color;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(x + cs / 2, y + cs / 2, cs * 0.28, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.fillStyle = st.color;
-          ctx.font = 'bold 18px "Segoe UI", sans-serif';
-          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(st.label, x + cs / 2, y + cs / 2 + 1);
+          drawItem(ctx, cell.kind, x + cs / 2, y + cs / 2, cs);
         } else {
           ctx.fillStyle = cell.type === 'attack'
             ? 'hsl(330 65% 42%)'                 // 공격 벽돌: 마젠타
@@ -129,4 +120,73 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+// ── 아이템 아이콘 (도형 기반, 글로우 포함) ──
+function drawItem(ctx, kind, cx, cy, cs) {
+  const st = ITEM_STYLE[kind];
+  ctx.save();
+  ctx.shadowColor = st.color;
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = st.color;
+  ctx.fillStyle = st.color;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+
+  // 공통 외곽 링 (획득 가능 오브젝트 표시)
+  ctx.beginPath();
+  ctx.arc(cx, cy, cs * 0.32, 0, Math.PI * 2);
+  ctx.stroke();
+
+  switch (kind) {
+    case 'ball+1': { // 구슬 + "+1"
+      ctx.beginPath();
+      ctx.arc(cx - 7, cy, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = 'bold 15px Consolas, monospace';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('+1', cx + 1, cy + 1);
+      break;
+    }
+    case 'pierce': { // 위로 뚫는 화살표 (몸통 + 촉)
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 11);
+      ctx.lineTo(cx, cy - 6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 12);
+      ctx.lineTo(cx - 6.5, cy - 3);
+      ctx.lineTo(cx + 6.5, cy - 3);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'split': { // 한 점에서 두 갈래 + 끝에 구슬
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 10);
+      ctx.lineTo(cx, cy + 2);
+      ctx.moveTo(cx, cy + 2);
+      ctx.lineTo(cx - 7, cy - 7);
+      ctx.moveTo(cx, cy + 2);
+      ctx.lineTo(cx + 7, cy - 7);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx - 8, cy - 9, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 8, cy - 9, 3.2, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'bomb': { // 코어 + 8방향 스파이크
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+      ctx.fill();
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * 7.5, cy + Math.sin(a) * 7.5);
+        ctx.lineTo(cx + Math.cos(a) * 12.5, cy + Math.sin(a) * 12.5);
+        ctx.stroke();
+      }
+      break;
+    }
+  }
+  ctx.restore();
 }
